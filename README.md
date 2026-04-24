@@ -1,280 +1,10 @@
 # Group15PathFinder
 
-This repository contains a small C program that simulates a bus moving on a `10 x 10` grid while servicing pickup and dropoff tasks. The grid is modeled as a graph, obstacles are placed randomly, routes are planned with an A* search, and pending tasks are prioritized by estimated path cost.
+This repository contains a small C project that simulates a bus moving on a `10 x 10` grid while servicing pickup and dropoff tasks. The grid is modeled as a graph, obstacles are generated randomly, routes are planned with A* pathfinding, and active tasks are prioritized with a min-heap based on path cost.
 
-The project is useful as a class-style prototype of:
-
-- graph modeling with linked neighbors
-- A* pathfinding on a grid with diagonal movement
-- a task priority queue implemented as a min-heap
-- a simple text-based simulation loop
-
-## What The Program Does
-
-At startup the program:
-
-1. Creates a `10 x 10` grid of `Node` objects.
-2. Connects each node to up to 8 neighbors.
-3. Places the bus at `(0, 0)`.
-4. Randomly marks 30 cells as blocked.
-5. Enters an interactive loop where the user can:
-   - add a route
-   - advance the simulation by one step
-
-Each route has:
-
-- a pickup coordinate
-- a dropoff coordinate
-- a single-character name
-- a computed path
-- a computed cost
-- a mode indicating whether the bus is traveling to pickup or to dropoff
-
-The bus always follows the task with the lowest current cost. After each simulation step, the code recomputes task paths and reorders the task heap.
+The recent cleanup focused on organization and modularity without changing the core behavior of the original program.
 
 ## Repository Layout
-
-- [178FinalProject.c](<c:\Users\jssau\MREN178-PathFindingAlgorithm\178FinalProject.c>) is the entry point and current interactive driver.
-- [Functions.c](<c:\Users\jssau\MREN178-PathFindingAlgorithm\Functions.c>) contains almost all real program logic.
-- [FunctionsAndDeclarations.h](<c:\Users\jssau\MREN178-PathFindingAlgorithm\FunctionsAndDeclarations.h>) declares types, globals, constants, and function prototypes.
-- [CMakeLists.txt](<c:\Users\jssau\MREN178-PathFindingAlgorithm\CMakeLists.txt>) contains a minimal CMake target definition.
-
-## File-By-File Summary
-
-### `178FinalProject.c`
-
-This file is the current executable entry point. Its main responsibilities are:
-
-- initializing the map by calling `path_finding_initialization()`
-- creating the task priority queue
-- displaying the current map
-- reading user input from the console
-- calling `add_route(...)` when the user enters a new request
-- calling `Simulate(...)` to move the bus one step at a time
-- freeing the allocated grid nodes at program shutdown
-
-Important details:
-
-- It includes `Functions.c` directly instead of including only the header. That is unusual in C projects, but it is how this repository currently builds.
-- A very large block of commented-out code at the top duplicates structs and functions that already exist in `Functions.c`. It appears to be an older in-file copy kept around during development.
-- `print_map_user(queue);` is called before `queue` is initialized. That is undefined behavior and should be fixed before treating the program as stable.
-- The main loop runs forever and currently has no quit option.
-- The second prompt says `"starting coordinates"` twice; the second one is really the destination prompt.
-
-Practical takeaway:
-
-This file is mostly UI and orchestration code, but it currently contains a lot of historical clutter that makes it harder to understand than it needs to be.
-
-### `Functions.c`
-
-This is the core implementation file. It contains nearly all of the project logic.
-
-Major areas in this file:
-
-#### 1. Task priority queue
-
-These functions implement a min-heap of `task*` ordered by `task->cost`:
-
-- `initialize_priority()`
-- `heapify_priority(...)`
-- `insert_priority(...)`
-- `pop_heap_priority(...)`
-
-This heap decides which route the bus should service next.
-
-#### 2. A* support utilities
-
-These helpers support pathfinding:
-
-- `getGHCost(...)` computes a Euclidean-distance-based heuristic/cost estimate
-- `checkFull(...)`, `push(...)`, `checkEmpty(...)`, `pop(...)` manage the path stack
-- `getFCost(...)` updates or evaluates `g`, `h`, and `f` costs
-- `checkArray(...)` searches a node array linearly
-
-#### 3. Open-list heap for A*
-
-These functions implement a second min-heap, this time for `Node*`:
-
-- `initialize()`
-- `heapify(...)`
-- `insert(...)`
-- `pop_heap(...)`
-
-This heap is the A* frontier, ordered by `f_cost` with `g_cost` as a tiebreaker.
-
-#### 4. Pathfinding
-
-- `Astar(...)` searches from a start node to a target node and stores the resulting path in the task's stack.
-
-Behavior:
-
-- blocked cells (`type == 1`) are avoided
-- 8-directional movement is allowed
-- each found path is stored by following parent pointers backward from target to start
-
-#### 5. Task creation and cost calculation
-
-- `initialize_task(...)` allocates and initializes a route
-- `path_cost(...)` converts a stored path into a numeric movement cost
-
-Straight moves cost `10`; diagonal moves cost `14`.
-
-#### 6. Map display helpers
-
-- `searchQueue(...)` finds a task marker to print
-- `print_map_user(...)` prints the map with `(0,0)` at bottom-left
-- `print_map_computer(...)` prints the map in array order
-
-Cell types are effectively:
-
-- `0` = open road
-- `1` = wall/blockage
-- `2` = active task marker
-- `3` = bus
-
-#### 7. Grid and obstacle generation
-
-- `createNode(...)` allocates one node
-- `random1()` places random walls while trying not to completely trap the bus at startup
-- `random2()` appears to be an alternate wall generator intended to avoid corner traps
-- `path_finding_initialization()` builds the graph, links neighbors, places the bus, and generates walls
-
-#### 8. Simulation
-
-- `add_route(...)` creates a task, computes its initial path from the current bus position to the pickup point, and inserts it into the priority queue
-- `QIsFull()`, `QIsEmpty()`, `enqueue(...)`, `dequeue(...)` manage a temporary circular queue used while rebuilding task priorities
-- `Simulate(...)` advances the bus by one node, updates task modes, recomputes paths, and rebuilds the task heap
-- `takeStep(...)` is a simpler movement helper that looks like an earlier simulation utility
-
-Practical takeaway:
-
-This file contains the actual system behavior: data structures, pathfinding, route scheduling, and simulation updates.
-
-### `FunctionsAndDeclarations.h`
-
-This header centralizes shared declarations for the program.
-
-It contains:
-
-- `ERR` and `OK` macros
-- the definitions of `Node`, `stack`, `task`, `heap_priority`, and `heap`
-- global state declarations for:
-  - `map`
-  - `bus`
-  - `busians`
-  - `busians_index`
-  - temporary queue state
-- function prototypes for all major functions in `Functions.c`
-
-Important detail:
-
-- The include guard is malformed: `#ifndef def FUNC_DEC` is not valid style and produces a compiler warning. It should be replaced with a normal pattern such as:
-
-```c
-#ifndef FUNC_DEC
-#define FUNC_DEC
-...
-#endif
-```
-
-- The header defines global variables directly. In a cleaner multi-file C layout, these would usually be declared with `extern` in the header and defined once in a `.c` file.
-
-Practical takeaway:
-
-The header currently acts as both an interface file and a storage location for global state, which works poorly as the project grows.
-
-### `CMakeLists.txt`
-
-This is a minimal build definition:
-
-- requires CMake `3.26`
-- creates a C11 project named `Group15PathFinder`
-- builds a single executable from `178FinalProject.c`
-
-Important detail:
-
-- It does not list `Functions.c` as a separate compilation unit.
-- The build succeeds only because `178FinalProject.c` directly includes `Functions.c`.
-
-Practical takeaway:
-
-The current CMake file reflects the project's current workaround-based layout, not a clean modular layout.
-
-## Current Build Behavior
-
-The repository currently compiles with a direct command like:
-
-```powershell
-gcc 178FinalProject.c -o build\app.exe -lm
-```
-
-That works because:
-
-- `178FinalProject.c` includes `Functions.c`
-- `Functions.c` includes `FunctionsAndDeclarations.h`
-
-Current warning observed during compilation:
-
-- `FunctionsAndDeclarations.h` has an invalid include-guard directive and emits a preprocessor warning
-
-## How The Program Flows
-
-High-level control flow:
-
-1. `main()` calls `path_finding_initialization()`
-2. The map and node graph are built
-3. The user adds tasks with pickup and dropoff points
-4. `add_route(...)` computes a path to the pickup point and inserts the task into the priority queue
-5. `Simulate(...)` moves the bus one step along the current best task
-6. After each step, task paths and costs are recomputed and the priority queue is rebuilt
-
-## Known Issues And Rough Edges
-
-These are worth knowing before further development:
-
-- `178FinalProject.c` includes `Functions.c` directly instead of using separate compilation.
-- `queue` is used before initialization in `main()`.
-- The header defines globals instead of declaring them with `extern`.
-- There is a large amount of commented-out duplicate code in `178FinalProject.c`.
-- `random2()` appears unused.
-- `takeStep()` appears unused by the main flow.
-- `temporaryHeapStorage` is declared but appears unused.
-- `busians` and `busians_index` are written to, but do not appear to affect runtime behavior.
-- `windows.h` is included in `Functions.c` but does not appear to be used.
-- Memory allocated for tasks, stacks, heaps, and temporary structures is not fully cleaned up.
-- The simulation loop has no quit option.
-- Input validation is minimal.
-
-## Suggested Cleanup Roadmap
-
-If the goal is to make the repository understandable to new contributors, the most valuable cleanup sequence is:
-
-1. Fix correctness and build hygiene.
-2. Remove commented-out and unused code.
-3. Separate interface, implementation, and program entry point cleanly.
-4. Add usage documentation and inline comments only where they help.
-5. Add basic tests for map creation, route creation, and A* pathfinding.
-
-Recommended concrete changes:
-
-- Change `178FinalProject.c` to include `FunctionsAndDeclarations.h` instead of `Functions.c`.
-- Update `CMakeLists.txt` to compile both `178FinalProject.c` and `Functions.c`.
-- Fix the include guard in the header.
-- Move global variable definitions into one `.c` file and use `extern` declarations in the header.
-- Remove the giant commented-out duplicate block in `178FinalProject.c`.
-- Remove unused variables and functions after confirming they are truly dead.
-- Rename files to clearer names such as:
-  - `main.c`
-  - `pathfinding.c`
-  - `pathfinding.h`
-  - `simulation.c`
-  - `simulation.h`
-- Add a quit option to the interactive loop.
-- Validate user coordinates before indexing into `map`.
-
-## Suggested Future Structure
-
-A cleaner version of the repository could look like:
 
 ```text
 .
@@ -293,6 +23,283 @@ A cleaner version of the repository could look like:
     `-- test_pathfinding.c
 ```
 
+## What The Program Does
+
+At startup the program:
+
+1. Creates a `10 x 10` grid of `Node` objects.
+2. Connects each node to up to 8 neighbors.
+3. Places the bus at `(0, 0)`.
+4. Randomly marks 30 cells as blocked.
+5. Enters an interactive loop where the user can:
+   - add a route
+   - simulate one movement step
+   - quit the program
+
+Each route stores:
+
+- a pickup coordinate
+- a dropoff coordinate
+- a single-character label
+- a stored path stack
+- a computed path cost
+- a mode indicating whether the task is heading toward pickup or dropoff
+
+The bus always follows the task with the smallest current route cost. After each simulation step, all active task paths are recomputed and the task heap is rebuilt.
+
+## File-By-File Summary
+
+### `src/main.c`
+
+This is the entry point and console driver for the program.
+
+Responsibilities:
+
+- initializes the map and the task queue
+- prints the initial map
+- presents the menu loop
+- reads and validates user input
+- calls `add_route(...)` for new tasks
+- calls `Simulate(...)` to move the bus one step
+- frees the map nodes before exiting
+
+Notable cleanup changes:
+
+- the queue is now initialized before first use
+- the program now has a quit option
+- prompts are clearer
+- coordinate input is validated before indexing the map
+
+### `src/pathfinding.c`
+
+This file contains the pathfinding and grid-construction logic.
+
+Key responsibilities:
+
+- computes movement and heuristic costs with `getGHCost(...)`
+- computes `f`, `g`, and `h` values with `getFCost(...)`
+- performs A* search in `Astar(...)`
+- computes full task path costs in `path_cost(...)`
+- allocates grid nodes with `createNode(...)`
+- randomly generates blockages with `random1()`
+- builds and links the `10 x 10` node grid in `path_finding_initialization()`
+- exposes `is_within_bounds(...)` for coordinate checks
+
+This file is where the graph and A* behavior live.
+
+### `src/simulation.c`
+
+This file contains route/task management and map-printing behavior.
+
+Key responsibilities:
+
+- allocates tasks in `initialize_task(...)`
+- prints task markers with `searchQueue(...)`
+- prints the map for users in `print_map_user(...)`
+- prints the map in array order in `print_map_computer(...)`
+- creates and queues new routes in `add_route(...)`
+- advances the simulation and reprioritizes tasks in `Simulate(...)`
+
+This file is where the higher-level scheduling behavior lives.
+
+### `src/data_structures.c`
+
+This file owns the shared global state and the low-level data-structure helpers.
+
+Key responsibilities:
+
+- defines global storage for:
+  - `map`
+  - `bus`
+  - temporary queue state used while rebuilding priorities
+- implements the task min-heap:
+  - `initialize_priority(...)`
+  - `heapify_priority(...)`
+  - `insert_priority(...)`
+  - `pop_heap_priority(...)`
+- implements stack helpers:
+  - `checkFull(...)`
+  - `push(...)`
+  - `checkEmpty(...)`
+  - `pop(...)`
+- implements A* open-list heap helpers:
+  - `initialize(...)`
+  - `heapify(...)`
+  - `insert(...)`
+  - `pop_heap(...)`
+- implements the temporary queue used during reprioritization:
+  - `QIsFull(...)`
+  - `QIsEmpty(...)`
+  - `enqueue(...)`
+  - `dequeue(...)`
+
+This file now centralizes the shared state that previously lived in the old header.
+
+### `include/data_structures.h`
+
+This header defines the shared structs, constants, global declarations, and low-level helper prototypes.
+
+It contains:
+
+- `ERR` and `OK`
+- `Node`
+- `stack`
+- `task`
+- `heap_priority`
+- `heap`
+- `extern` declarations for the shared global state
+- prototypes for heap, stack, and temporary queue helpers
+
+This replaces the old header pattern where globals were defined directly in the header.
+
+### `include/pathfinding.h`
+
+This header exposes the pathfinding and grid setup API:
+
+- `getGHCost(...)`
+- `getFCost(...)`
+- `Astar(...)`
+- `path_cost(...)`
+- `createNode(...)`
+- `random1()`
+- `path_finding_initialization()`
+- `is_within_bounds(...)`
+- `is_obstacle(...)`
+
+### `include/simulation.h`
+
+This header exposes the simulation and route-management API:
+
+- `initialize_task(...)`
+- `searchQueue(...)`
+- `print_map_user(...)`
+- `print_map_computer(...)`
+- `add_route(...)`
+- `Simulate(...)`
+
+### `tests/test_pathfinding.c`
+
+This is a small smoke test for the reorganized project.
+
+It currently verifies that:
+
+- initialization succeeds
+- the bus starts at `(0, 0)`
+- the starting node is marked correctly
+- the grid links are present for immediate neighbors
+
+It is intentionally small, but it gives the repository a starting point for future tests.
+
+### `CMakeLists.txt`
+
+This file now builds the project using normal separate compilation.
+
+It:
+
+- includes headers from `include/`
+- builds the main executable from the `src/` files
+- builds a small `test_pathfinding` executable from `tests/`
+- links the math library where needed
+- registers the smoke test with CTest
+
+## Build Instructions
+
+These commands are intended to work for anyone who clones the repository, as long as they have CMake and a C compiler installed. The generated `build/` directory is local output and should not be committed.
+
+### Configure
+
+```sh
+cmake -S . -B build
+```
+
+### Build
+
+```sh
+cmake --build build
+```
+
+### Run The Main Program
+
+On Windows:
+
+```powershell
+.\build\Group15PathFinder.exe
+```
+
+On macOS or Linux:
+
+```sh
+./build/Group15PathFinder
+```
+
+### Run The Smoke Test
+
+On Windows:
+
+```powershell
+.\build\test_pathfinding.exe
+```
+
+On macOS or Linux:
+
+```sh
+./build/test_pathfinding
+```
+
+Or with CTest:
+
+```sh
+ctest --test-dir build --output-on-failure
+```
+
+## Generated Build Files
+
+If you see files such as `build.ninja`, `.ninja_log`, `CTestTestfile.cmake`, or files under `build/CMakeFiles/`, those are generated by CMake and Ninja during local builds.
+
+- `build.ninja` and `rules.ninja` tell the Ninja build tool how to compile the project.
+- `.ninja_log` and `.ninja_deps` store incremental-build bookkeeping.
+- `CTestTestfile.cmake` is generated by CMake so `ctest` knows what tests exist.
+- `build/CMakeFiles/` contains internal compiler and dependency metadata.
+
+These files are relevant to a local build, but they are not source files and should generally not be tracked in the repository. A fresh clone should be able to regenerate them by running the configure and build commands above.
+
+## How The Program Flows
+
+1. `main()` calls `path_finding_initialization()`.
+2. The node grid is created and linked.
+3. The bus is placed at `(0, 0)`.
+4. Random blockages are generated.
+5. The user adds routes through the menu.
+6. `add_route(...)` computes a path from the bus to the pickup point and inserts the task into the priority heap.
+7. `Simulate(...)` moves the bus by one step along the current best route.
+8. After each step, task paths and costs are recomputed and the heap is rebuilt.
+
+## Cleanup Results
+
+The repository organization was improved in the following ways:
+
+- the old direct `#include "Functions.c"` build pattern was removed
+- the broken header guard was replaced with normal header guards in the new headers
+- shared global state was moved out of headers and into one implementation file
+- dead code and unused items were removed:
+  - the giant commented-out duplicate block in the old entry file
+  - `random2`
+  - `takeStep`
+  - `temporaryHeapStorage`
+  - `busians`
+  - `windows.h`
+- the build now uses normal multi-file compilation
+- the entry-point UI now has clearer prompts, validation, and a quit path
+- small inline comments were added where they help explain intent
+
+## Suggested Future Works
+
+- add unit tests for route insertion, A* success cases, and blocked-route cases
+- add cleanup for dynamically allocated tasks, stacks, and heaps before program exit
+- separate map rendering from simulation logic even further if the project keeps growing
+- add deterministic map-generation support for reproducible debugging
+- add a non-interactive mode for automated demonstrations or grading
+
 ## Summary
 
-This repository already contains a real working idea: a grid graph, A* pathfinding, route prioritization, and step-by-step simulation. The main challenge is not missing functionality, but organization. Most of the cleanup work should focus on removing duplicated history, separating files by responsibility, fixing a few correctness issues, and documenting the intended architecture clearly.
+This repository now reflects a more standard C project layout while preserving the original core behavior: graph creation, A* pathfinding, task prioritization, and step-by-step bus simulation. The code is easier to navigate, safer to build, and more approachable for new contributors than the original single-entry-file arrangement.

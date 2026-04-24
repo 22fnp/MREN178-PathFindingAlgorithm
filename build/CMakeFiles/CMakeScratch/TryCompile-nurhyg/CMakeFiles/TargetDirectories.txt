@@ -1,3 +1,0 @@
-C:/Users/jssau/MREN178-PathFindingAlgorithm/build/CMakeFiles/CMakeScratch/TryCompile-nurhyg/CMakeFiles/cmTC_9fa6c.dir
-C:/Users/jssau/MREN178-PathFindingAlgorithm/build/CMakeFiles/CMakeScratch/TryCompile-nurhyg/CMakeFiles/edit_cache.dir
-C:/Users/jssau/MREN178-PathFindingAlgorithm/build/CMakeFiles/CMakeScratch/TryCompile-nurhyg/CMakeFiles/rebuild_cache.dir
